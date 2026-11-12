@@ -15,8 +15,11 @@ for symbol in TICKERS:
         df=df.dropna(subset=['Open','High','Low','Close','Volume'])
         # Latest US trading session, timestamps provided by Yahoo in exchange-local zone.
         dates=df.index.date
-        day=df.loc[dates==max(dates)].copy()
-        if len(day)<20: raise ValueError('fewer than 20 intraday bars')
+        sessions=[(d,df.loc[dates==d].copy()) for d in sorted(set(dates),reverse=True)]
+        valid=[(d,bars) for d,bars in sessions if len(bars)>=20]
+        if not valid: raise ValueError('no session with 20 intraday bars; counts='+str([(str(d),len(b)) for d,b in sessions]))
+        session_date,day=valid[0]
+        is_latest_session=(session_date==max(dates))
         # Only use complete historical bars; the newest bar may be in progress.
         day=day.iloc[:-1]
         if len(day)<19: raise ValueError('not enough completed bars')
@@ -31,7 +34,7 @@ for symbol in TICKERS:
         stop=low
         per_share=last-stop
         shares=math.floor(min(CAPITAL/last,RISK/per_share)) if confirmed and per_share>0 else 0
-        results.append({'symbol':symbol,'session':str(max(dates)),'last_price_usd':round(last,3),'opening_high_usd':round(high,3),'vwap_usd':round(vwap,3),'volume_ratio':round(vol/avg,2) if avg else None,'signal':'WATCH_LONG' if confirmed and shares>0 else 'NO_TRADE','max_whole_shares_illustrative':shares,'note':'Signals only; no orders. EUR capital vs USD shares requires FX conversion before sizing.'})
+        results.append({'symbol':symbol,'session':str(session_date),'historical_session':not is_latest_session,'last_price_usd':round(last,3),'opening_high_usd':round(high,3),'vwap_usd':round(vwap,3),'volume_ratio':round(vol/avg,2) if avg else None,'signal':'WATCH_LONG' if confirmed and shares>0 and is_latest_session else ('HISTORICAL_SIGNAL' if confirmed and shares>0 else 'NO_TRADE'),'max_whole_shares_illustrative':shares if is_latest_session else 0,'note':'Signals only; no orders. EUR capital vs USD shares requires FX conversion before sizing.'})
     except Exception as e:
         results.append({'symbol':symbol,'signal':'DATA_ERROR','reason':str(e)[:160]})
 report={'generated_utc':datetime.now(timezone.utc).isoformat(),'mode':'SCAN_ONLY','virtual_capital_eur':CAPITAL,'risk_per_trade_eur':RISK,'daily_loss_limit_eur':15,'warning':'No broker, no simulated execution, no P&L. Delayed/incomplete data possible. USD share sizing is illustrative only.','results':results}
