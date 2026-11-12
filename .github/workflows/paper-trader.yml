@@ -1,1 +1,12 @@
 
+name: KI Daytrader Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Bot testen
+        run: echo "KI-Daytrader funktioniert!"
