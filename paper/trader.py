@@ -17,9 +17,18 @@ RISK_EUR = 10.0
 DAILY_LOSS_LIMIT_EUR = 15.0
 MAX_POSITION_EUR = 150.0
 ROUND_TRIP_COST_RATE = 0.002  # 0.1% each side, proxy for spread/slippage/fees
-USD_EUR = float(os.environ.get("USD_EUR", "0"))
-if USD_EUR <= 0:
-    raise RuntimeError("Set USD_EUR to a current, verified USD-to-EUR rate; do not assume 1:1.")
+def fetch_usd_eur():
+    """Fetch EUR per USD from Frankfurter's ECB reference-rate feed."""
+    url = "https://api.frankfurter.dev/v1/latest?base=USD&symbols=EUR"
+    req = urllib.request.Request(url, headers={"User-Agent": "ai-daytrader-paper/1.0"})
+    with urllib.request.urlopen(req, timeout=20) as response:
+        data = json.load(response)
+    rate = float(data["rates"]["EUR"])
+    rate_date = datetime.strptime(data["date"], "%Y-%m-%d").date()
+    age = (datetime.now(timezone.utc).date() - rate_date).days
+    if not math.isfinite(rate) or rate <= 0 or not 0 <= age <= 4:
+        raise RuntimeError(f"Invalid or stale USD/EUR rate: {rate}, {rate_date}")
+    return rate, str(rate_date)
 
 def prices(symbol):
     url = "https://stooq.com/q/d/l/?s=" + symbol.lower() + "&i=d"
@@ -44,6 +53,8 @@ def sma(vals, n):
 
 def main():
     now = datetime.now(timezone.utc).isoformat()
+    global USD_EUR
+    USD_EUR, fx_date = fetch_usd_eur()
     market = {s: prices(s) for s in SYMBOLS}  # fail closed if any feed is unavailable
     dates = {bars[-1]["date"] for bars in market.values()}
     if len(dates) != 1:
@@ -98,13 +109,14 @@ def main():
     state["cash_eur"] = round(state["cash_eur"], 4)
     state["last_processed_date"] = date
     report = {"generated_utc": now, "market_date": date, "mode": "PAPER_ONLY",
+              "usd_eur_rate": USD_EUR, "fx_rate_date": fx_date,
               "cash_eur": round(state["cash_eur"], 2), "equity_eur": round(equity, 2),
               "pnl_since_start_eur": round(equity - START_CASH, 2),
               "position": position, "actions": actions,
               "trades_count": len(state["trades"]),
               "warnings": ["End-of-day hindsight fills: not executable live prices.",
                            "Daily close data: intraday stops and gap losses not simulated.",
-                           "USD_EUR must be supplied externally and updated.",
+                           "ECB reference FX rate is indicative, not an executable FX fill.",
                            "No brokerage integration; results do not prove profitability."]}
     STATE.parent.mkdir(parents=True, exist_ok=True)
     STATE.write_text(json.dumps(state, indent=2) + "\n")
