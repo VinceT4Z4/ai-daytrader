@@ -95,8 +95,9 @@ def run_day(state, market, fx_rate):
         elif lows[symbol] <= stop:
             sell(state, symbol, position["shares"], stop, day, "intraday_stop_approximation", actions)
     # Daily loss gate based on mark-to-market, not just realized P&L.
-    current_equity = equity(state, closes)
-    if state["position"] is None and current_equity - start_equity > -DAILY_LOSS_LIMIT_EUR:
+    # Gate entry using the OPEN, before the close of the execution session is known.
+    open_equity = equity(state, opens)
+    if state["position"] is None and open_equity - start_equity > -DAILY_LOSS_LIMIT_EUR:
         for symbol in SYMBOLS:
             if not crossed_up(market[symbol]):
                 continue
