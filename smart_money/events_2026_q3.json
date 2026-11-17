@@ -1,0 +1,85 @@
+{
+  "as_of": "2026-11-17",
+  "quarter_end": "2026-09-30",
+  "mode": "RESEARCH_ONLY",
+  "disclaimer": "Delayed quarterly disclosures; changes in reported shares, not proof of trades today. No automatic trade signals. Verify primary filings and amendments before decisions.",
+  "events": [
+    {
+      "investor": "Bill Ackman / Pershing Square",
+      "ticker": "MSFT",
+      "action": "REDUCED",
+      "change_pct": -34.5,
+      "quarter": "2026-Q3",
+      "filed": "2026-11-16",
+      "source": "https://www.sec.gov/Archives/edgar/data/2026053/000117266126005427/xslForm13F_X02/primary_doc.xml",
+      "evidence": "Secondary analysis of Q3 13F; primary cover verified, holdings comparison not independently verified",
+      "confidence": "secondary"
+    },
+    {
+      "investor": "David Tepper / Appaloosa",
+      "ticker": "MU",
+      "action": "INCREASED",
+      "change_pct": null,
+      "quarter": "2026-Q3",
+      "filed": "2026-11-16",
+      "source": "https://www.reuters.com/legal/transactional/investors-cooled-data-center-stocks-third-quarter-filings-show-2026-11-16/",
+      "evidence": "Reuters 13F analysis",
+      "confidence": "reputable_secondary"
+    },
+    {
+      "investor": "David Tepper / Appaloosa",
+      "ticker": "NVDA",
+      "action": "INCREASED",
+      "change_pct": null,
+      "quarter": "2026-Q3",
+      "filed": "2026-11-16",
+      "source": "https://www.reuters.com/legal/transactional/investors-cooled-data-center-stocks-third-quarter-filings-show-2026-11-16/",
+      "evidence": "Reuters 13F analysis",
+      "confidence": "reputable_secondary"
+    },
+    {
+      "investor": "David Tepper / Appaloosa",
+      "ticker": "ASML",
+      "action": "INCREASED",
+      "change_pct": null,
+      "quarter": "2026-Q3",
+      "filed": "2026-11-16",
+      "source": "https://www.reuters.com/legal/transactional/investors-cooled-data-center-stocks-third-quarter-filings-show-2026-11-16/",
+      "evidence": "Reuters 13F analysis",
+      "confidence": "reputable_secondary"
+    },
+    {
+      "investor": "David Tepper / Appaloosa",
+      "ticker": "AMD",
+      "action": "EXITED",
+      "change_pct": -100,
+      "quarter": "2026-Q3",
+      "filed": "2026-11-16",
+      "source": "https://www.reuters.com/legal/transactional/investors-cooled-data-center-stocks-third-quarter-filings-show-2026-11-16/",
+      "evidence": "Reuters 13F analysis",
+      "confidence": "reputable_secondary"
+    },
+    {
+      "investor": "Dan Loeb / Third Point",
+      "ticker": "ASML",
+      "action": "EXITED",
+      "change_pct": -100,
+      "quarter": "2026-Q3",
+      "filed": "2026-11-16",
+      "source": "https://www.reuters.com/legal/transactional/investors-cooled-data-center-stocks-third-quarter-filings-show-2026-11-16/",
+      "evidence": "Reuters 13F analysis",
+      "confidence": "reputable_secondary"
+    },
+    {
+      "investor": "Dan Loeb / Third Point",
+      "ticker": "GOOGL",
+      "action": "REDUCED",
+      "change_pct": null,
+      "quarter": "2026-Q3",
+      "filed": "2026-11-16",
+      "source": "https://www.reuters.com/legal/transactional/investors-cooled-data-center-stocks-third-quarter-filings-show-2026-11-16/",
+      "evidence": "Reuters 13F analysis; Alphabet share class requires verification",
+      "confidence": "reputable_secondary"
+    }
+  ]
+}

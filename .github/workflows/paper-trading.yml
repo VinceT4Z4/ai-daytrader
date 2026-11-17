@@ -1,0 +1,31 @@
+name: Paper trading daily scan
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 23 * * 1-5'
+permissions:
+  contents: write
+concurrency:
+  group: paper-trading
+  cancel-in-progress: false
+jobs:
+  paper:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run unit tests\n        run: python -m unittest discover -s tests -v\n      - name: Run simulation
+        run: python paper/trader.py
+      - name: Scan real-portfolio watchlist (read-only)\n        run: python portfolio/watchlist.py\n      - name: Build smart-money research report\n        run: python smart_money/report.py\n      - name: Commit paper state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add paper/state.json paper/latest_report.json portfolio/watchlist_report.json smart_money/latest_report.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Update daily paper-trading state"
+            git push
+          fi
