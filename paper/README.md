@@ -1,17 +1,28 @@
-# Paper Trading v1 (experimental)
+# AI Daytrader — experimental paper trading
 
-This branch adds an **unvalidated daily-bar simulation**. It never connects to a broker.
+## Safety and scope
+- **NO BROKER, NO REAL ORDERS.** Real holdings are a read-only watchlist snapshot.
+- EUR 500 virtual cash; EUR 10 intended stop distance risk; EUR 15 daily loss entry gate; EUR 150 max nominal per position.
+- Five paper-trading symbols: AAPL, MSFT, NVDA, AMD, SPY.
+- 5/20-day simple moving-average crossover on the **previous session**; simulate entry at **next session open**.
+- Exit at next open on prior close below SMA20, or approximate intraday stop; gaps below stop exit at open.
+- Integer shares, 0.1% cost per side, max one position.
+- Stooq daily OHLC and Frankfurter/ECB reference FX; fail closed on stale/missing data.
+- Real watchlist: `portfolio/holdings_snapshot.json`; `portfolio/watchlist.py` produces a separate read-only report.
 
-- Universe: AAPL, MSFT, NVDA, AMD, SPY (Stooq daily USD closes).
-- Entry: 5-day SMA crosses above 20-day SMA; one long position at a time.
-- Exit: close below 20-day SMA or below a fixed 2% stop (evaluated only on daily close).
-- Start capital EUR 500; target risk EUR 10 per trade; daily realized-loss gate EUR 15; max position EUR 150.
-- Integer shares only; 0.1% cost proxy on entry and exit.
-- Persisted files: `paper/state.json` and `paper/latest_report.json`.
+## Running
+`python -m unittest discover -s tests -v`
+`python paper/trader.py`
+`python portfolio/watchlist.py`
 
-**Major limitations:** same-close signal and execution introduces look-ahead bias; no intraday stops or realistic gap execution, stale daily data possible, FX rate must be maintained. This is a software smoke-test, **not** an honest performance backtest or live-ready strategy. Losses can exceed the intended stop.
+GitHub Actions daily workflow is scheduled 23:30 UTC weekdays. GitHub only schedules workflows on the default branch, so **this feature branch will not auto-run on a schedule** until merged. Runs may be delayed; weekends/holidays skip duplicate market dates. Workflow requires Actions write permission to commit reports/state; GitHub repository settings may block that.
 
-### Setup
-Create GitHub Actions repository variable `USD_EUR` with a **verified current** EUR value of one USD (e.g. not hardcoded in code). Enable Actions for this branch and manually dispatch the workflow. Scheduled workflows only run automatically when the workflow is present on the repository's **default branch**; merge after review if scheduling is desired. Workflow runs on weekdays at 23:30 UTC and may be delayed by GitHub.
+## Known limitations
+- Not a daytrading strategy: **daily-bar swing-trading prototype**.
+- Intraday OHLC order unknown. Same-day stop for newly opened position is deliberately not simulated.
+- Stops, EUR 10 risk and EUR 15 daily gate **cannot guarantee** maximum realized loss.
+- Reference FX applied to all historic OHLC of the current session, not transaction-specific historical FX.
+- No robust backtest, no walk-forward validation, no real broker execution, no dividend/corporate-action audit, no benchmark.
+- Do not interpret generated actions as investment recommendations.
 
-Next: replace same-close execution with next-session open execution; use adjusted OHLC data, proper FX historical rates, backtest with costs, add tests, and validate risk controls before relying on results.
+Next steps: verify CI, instrument IDs for ETFs, add realistic walk-forward backtest and benchmark, then evaluate any move to higher-frequency trading with licensed market data.
