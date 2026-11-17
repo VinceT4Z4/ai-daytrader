@@ -20,8 +20,6 @@ jobs:
         with:
           python-version: '3.12'
       - name: Run simulation
-        env:
-          USD_EUR: ${{ vars.USD_EUR }}
         run: python paper/trader.py
       - name: Commit paper state
         run: |
