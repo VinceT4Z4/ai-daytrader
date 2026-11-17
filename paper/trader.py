@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""Daily-bar paper trader. Simulation only; never sends broker orders."""
+"""Daily-bar paper trading; next-session OPEN fills, no broker integration."""
 import csv
 import io
 import json
 import math
-import os
 import urllib.request
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 STATE = Path("paper/state.json")
@@ -16,108 +15,143 @@ START_CASH = 500.0
 RISK_EUR = 10.0
 DAILY_LOSS_LIMIT_EUR = 15.0
 MAX_POSITION_EUR = 150.0
-ROUND_TRIP_COST_RATE = 0.002  # 0.1% each side, proxy for spread/slippage/fees
+SIDE_COST_RATE = 0.001
+MAX_MARKET_AGE_DAYS = 5
+
+def get_json(url):
+    request = urllib.request.Request(url, headers={"User-Agent": "ai-daytrader-paper/1.0"})
+    with urllib.request.urlopen(request, timeout=20) as response:
+        return json.load(response)
+
 def fetch_usd_eur():
-    """Fetch EUR per USD from Frankfurter's ECB reference-rate feed."""
-    url = "https://api.frankfurter.dev/v1/latest?base=USD&symbols=EUR"
-    req = urllib.request.Request(url, headers={"User-Agent": "ai-daytrader-paper/1.0"})
-    with urllib.request.urlopen(req, timeout=20) as response:
-        data = json.load(response)
+    data = get_json("https://api.frankfurter.dev/v1/latest?base=USD&symbols=EUR")
     rate = float(data["rates"]["EUR"])
-    rate_date = datetime.strptime(data["date"], "%Y-%m-%d").date()
-    age = (datetime.now(timezone.utc).date() - rate_date).days
-    if not math.isfinite(rate) or rate <= 0 or not 0 <= age <= 4:
-        raise RuntimeError(f"Invalid or stale USD/EUR rate: {rate}, {rate_date}")
-    return rate, str(rate_date)
+    fx_date = date.fromisoformat(data["date"])
+    age = (datetime.now(timezone.utc).date() - fx_date).days
+    if not math.isfinite(rate) or not 0 <= age <= 4:
+        raise RuntimeError("Missing/stale USD-EUR FX data")
+    if not 0.5 < rate < 1.5:
+        raise RuntimeError("Implausible USD-EUR FX data")
+    return rate, str(fx_date)
 
-def prices(symbol):
-    url = "https://stooq.com/q/d/l/?s=" + symbol.lower() + "&i=d"
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=20) as response:
-        raw = response.read().decode("utf-8")
-    rows = list(csv.DictReader(io.StringIO(raw)))
-    valid = []
-    for row in rows:
-        try:
-            close = float(row["Close"])
-            if close > 0 and math.isfinite(close):
-                valid.append({"date": row["Date"], "close": close})
-        except (KeyError, ValueError, TypeError):
-            continue
-    if len(valid) < 25:
-        raise RuntimeError(f"Insufficient price history for {symbol}")
-    return valid
+def fetch_bars(symbol):
+    request = urllib.request.Request(
+        "https://stooq.com/q/d/l/?s=" + symbol.lower() + "&i=d",
+        headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(request, timeout=20) as response:
+        rows = csv.DictReader(io.StringIO(response.read().decode("utf-8")))
+        bars = []
+        for row in rows:
+            try:
+                bar = {"date": row["Date"], **{k.lower(): float(row[k]) for k in ("Open", "High", "Low", "Close")}}
+                if all(math.isfinite(bar[k]) and bar[k] > 0 for k in ("open", "high", "low", "close")):
+                    bars.append(bar)
+            except (KeyError, TypeError, ValueError):
+                continue
+    if len(bars) < 26 or any(bars[i]["date"] >= bars[i+1]["date"] for i in range(len(bars)-1)):
+        raise RuntimeError("Invalid history for " + symbol)
+    return bars
 
-def sma(vals, n):
-    return sum(vals[-n:]) / n
+def mean(values):
+    return sum(values) / len(values)
+
+def crossed_up(bars):
+    """Use only bars BEFORE the execution day."""
+    prior = [b["close"] for b in bars[:-1]]
+    return mean(prior[-5:]) > mean(prior[-20:]) and mean(prior[-6:-1]) <= mean(prior[-21:-1])
+
+def below_sma20(bars):
+    prior = [b["close"] for b in bars[:-1]]
+    return prior[-1] < mean(prior[-20:])
+
+def equity(state, close_eur):
+    pos = state["position"]
+    return state["cash_eur"] + (pos["shares"] * close_eur[pos["symbol"]] if pos else 0)
+
+def sell(state, symbol, shares, fill_price, day, reason, actions):
+    proceeds = shares * fill_price * (1 - SIDE_COST_RATE)
+    pnl = proceeds - state["position"]["entry_total_eur"]
+    state["cash_eur"] += proceeds
+    state["position"] = None
+    state["trades"].append({"date": day, "side": "SELL", "symbol": symbol, "shares": shares,
+                            "price_eur": round(fill_price, 4), "realized_pnl_eur": round(pnl, 4), "reason": reason})
+    actions.append("SELL " + symbol + " (" + reason + ")")
+
+def run_day(state, market, fx_rate):
+    day = next(iter(market.values()))[-1]["date"]
+    opens = {s: b[-1]["open"] * fx_rate for s, b in market.items()}
+    closes = {s: b[-1]["close"] * fx_rate for s, b in market.items()}
+    lows = {s: b[-1]["low"] * fx_rate for s, b in market.items()}
+    actions = []
+    start_equity = state.get("last_equity_eur", START_CASH)
+    position = state["position"]
+    if position:
+        symbol = position["symbol"]
+        stop = position["stop_eur"]
+        if opens[symbol] <= stop:
+            sell(state, symbol, position["shares"], opens[symbol], day, "gap_below_stop", actions)
+        elif below_sma20(market[symbol]):
+            sell(state, symbol, position["shares"], opens[symbol], day, "previous_close_below_sma20", actions)
+        elif lows[symbol] <= stop:
+            sell(state, symbol, position["shares"], stop, day, "intraday_stop_approximation", actions)
+    # Daily loss gate based on mark-to-market, not just realized P&L.
+    current_equity = equity(state, closes)
+    if state["position"] is None and current_equity - start_equity > -DAILY_LOSS_LIMIT_EUR:
+        for symbol in SYMBOLS:
+            if not crossed_up(market[symbol]):
+                continue
+            price = opens[symbol]
+            stop = price * 0.98
+            shares = int(min(MAX_POSITION_EUR / price, RISK_EUR / (price - stop),
+                             state["cash_eur"] / (price * (1 + SIDE_COST_RATE))))
+            if shares < 1:
+                continue
+            total = shares * price * (1 + SIDE_COST_RATE)
+            state["cash_eur"] -= total
+            state["position"] = {"symbol": symbol, "shares": shares, "entry_total_eur": total,
+                                 "stop_eur": stop, "entry_date": day}
+            state["trades"].append({"date": day, "side": "BUY", "symbol": symbol, "shares": shares,
+                                    "price_eur": round(price, 4)})
+            actions.append("BUY " + str(shares) + " " + symbol)
+            # Today's intraday low is NOT used to stop a new position because
+            # daily OHLC does not reveal whether low happened before or after entry.
+            break
+    end_equity = equity(state, closes)
+    state["cash_eur"] = round(state["cash_eur"], 6)
+    state["last_equity_eur"] = round(end_equity, 6)
+    state["last_processed_date"] = day
+    return actions, end_equity, start_equity
 
 def main():
-    now = datetime.now(timezone.utc).isoformat()
-    global USD_EUR
-    USD_EUR, fx_date = fetch_usd_eur()
-    market = {s: prices(s) for s in SYMBOLS}  # fail closed if any feed is unavailable
+    fx_rate, fx_date = fetch_usd_eur()
+    market = {symbol: fetch_bars(symbol) for symbol in SYMBOLS}
     dates = {bars[-1]["date"] for bars in market.values()}
     if len(dates) != 1:
-        raise RuntimeError("Price feeds have different last trading dates; no trades executed")
-    date = dates.pop()
+        raise RuntimeError("Different trading dates in feeds; refusing to simulate")
+    market_day = dates.pop()
+    age = (datetime.now(timezone.utc).date() - date.fromisoformat(market_day)).days
+    if age < 0 or age > MAX_MARKET_AGE_DAYS:
+        raise RuntimeError("Stale or future market data")
     state = json.loads(STATE.read_text()) if STATE.exists() else {
         "cash_eur": START_CASH, "position": None, "trades": [],
-        "last_processed_date": None, "day_start_equity_eur": START_CASH,
-    }
-    if state["last_processed_date"] == date:
-        print(f"Already processed {date}; no duplicate execution")
+        "last_processed_date": None, "last_equity_eur": START_CASH}
+    if state["last_processed_date"] == market_day:
+        print("Already processed " + market_day)
         return
-    closes = {s: market[s][-1]["close"] * USD_EUR for s in SYMBOLS}
-    position = state["position"]
-    start_equity = state["cash_eur"] + (position["shares"] * closes[position["symbol"]] if position else 0)
-    state["day_start_equity_eur"] = round(start_equity, 4)
-    actions = []
-    # This is a simplified end-of-day close-price simulation, NOT a fill achievable
-    # after observing the same close. Results are optimistic and not a backtest.
-    if position:
-        s = position["symbol"]
-        bars = market[s]
-        vals = [b["close"] for b in bars]
-        exit_signal = vals[-1] < sma(vals, 20) or closes[s] <= position["stop_eur"]
-        if exit_signal:
-            proceeds = position["shares"] * closes[s] * (1 - ROUND_TRIP_COST_RATE / 2)
-            state["cash_eur"] += proceeds
-            pnl = proceeds - position["entry_total_eur"]
-            state["trades"].append({"date": date, "symbol": s, "side": "SELL", "shares": position["shares"], "price_eur": round(closes[s], 4), "realized_pnl_eur": round(pnl, 4)})
-            actions.append(f"SELL {s}: simulated P&L {pnl:.2f} EUR")
-            state["position"] = None
-    realized_today = sum(t.get("realized_pnl_eur", 0) for t in state["trades"] if t["date"] == date)
-    if state["position"] is None and realized_today > -DAILY_LOSS_LIMIT_EUR:
-        for s in SYMBOLS:
-            vals = [b["close"] for b in market[s]]
-            if sma(vals, 5) > sma(vals, 20) and sma(vals[:-1], 5) <= sma(vals[:-1], 20):
-                price = closes[s]
-                stop = price * 0.98
-                shares = int(min(MAX_POSITION_EUR / price, RISK_EUR / (price - stop),
-                                 state["cash_eur"] / (price * (1 + ROUND_TRIP_COST_RATE / 2))))
-                if shares < 1:
-                    continue
-                total = shares * price * (1 + ROUND_TRIP_COST_RATE / 2)
-                state["cash_eur"] -= total
-                state["position"] = {"symbol": s, "shares": shares, "entry_total_eur": total,
-                                     "stop_eur": round(stop, 4), "entry_date": date}
-                state["trades"].append({"date": date, "symbol": s, "side": "BUY", "shares": shares, "price_eur": round(price, 4)})
-                actions.append(f"BUY {shares} {s} (simulation)")
-                break
-    position = state["position"]
-    equity = state["cash_eur"] + (position["shares"] * closes[position["symbol"]] if position else 0)
-    state["cash_eur"] = round(state["cash_eur"], 4)
-    state["last_processed_date"] = date
-    report = {"generated_utc": now, "market_date": date, "mode": "PAPER_ONLY",
-              "usd_eur_rate": USD_EUR, "fx_rate_date": fx_date,
-              "cash_eur": round(state["cash_eur"], 2), "equity_eur": round(equity, 2),
-              "pnl_since_start_eur": round(equity - START_CASH, 2),
-              "position": position, "actions": actions,
-              "trades_count": len(state["trades"]),
-              "warnings": ["End-of-day hindsight fills: not executable live prices.",
-                           "Daily close data: intraday stops and gap losses not simulated.",
-                           "ECB reference FX rate is indicative, not an executable FX fill.",
-                           "No brokerage integration; results do not prove profitability."]}
+    if state["last_processed_date"] and state["last_processed_date"] > market_day:
+        raise RuntimeError("Market date older than last processed date")
+    actions, end_equity, start_equity = run_day(state, market, fx_rate)
+    report = {"generated_utc": datetime.now(timezone.utc).isoformat(),
+              "market_date": market_day, "mode": "PAPER_ONLY",
+              "usd_eur_rate": fx_rate, "fx_rate_date": fx_date,
+              "cash_eur": round(state["cash_eur"], 2), "equity_eur": round(end_equity, 2),
+              "day_pnl_eur": round(end_equity - start_equity, 2),
+              "pnl_since_start_eur": round(end_equity - START_CASH, 2),
+              "position": state["position"], "actions": actions, "trades_count": len(state["trades"]),
+              "limitations": ["Daily OHLC is not intraday data; stop timing approximate.",
+                              "FX reference rates are not historical transaction rates.",
+                              "Daily loss limit is an entry gate, not a guaranteed loss cap.",
+                              "No validated backtest or live execution; paper only."]}
     STATE.parent.mkdir(parents=True, exist_ok=True)
     STATE.write_text(json.dumps(state, indent=2) + "\n")
     REPORT.write_text(json.dumps(report, indent=2) + "\n")
