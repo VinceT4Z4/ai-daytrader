@@ -1,0 +1,139 @@
+{
+  "snapshot_date": "2026-11-17",
+  "source": "User-provided Trade Republic screenshots; values manually transcribed",
+  "currency": "EUR",
+  "scope": "REAL_PORTFOLIO_WATCHLIST_ONLY",
+  "disclaimer": "Snapshot values, not live quotes. P&L is since purchase, not daily P&L. No brokerage connection or order permissions.",
+  "total_visible_value_eur": 14864.46,
+  "total_visible_pnl_since_purchase_eur": -2469.61,
+  "positions": [
+    {
+      "name": "FTSE Global All-Cap USD",
+      "market_value_eur": 6878.21,
+      "pnl_since_purchase_eur": -43.83,
+      "data_symbol_candidate": null,
+      "asset_class": "ETF",
+      "note": "instrument identification required"
+    },
+    {
+      "name": "Micron Technology",
+      "market_value_eur": 1662.98,
+      "pnl_since_purchase_eur": -854.34,
+      "data_symbol_candidate": "MU.US",
+      "asset_class": "stock",
+      "note": null
+    },
+    {
+      "name": "Microsoft",
+      "market_value_eur": 1441.64,
+      "pnl_since_purchase_eur": 210.97,
+      "data_symbol_candidate": "MSFT.US",
+      "asset_class": "stock",
+      "note": null
+    },
+    {
+      "name": "Vertiv",
+      "market_value_eur": 1114.87,
+      "pnl_since_purchase_eur": -719.82,
+      "data_symbol_candidate": "VRT.US",
+      "asset_class": "stock",
+      "note": null
+    },
+    {
+      "name": "ASML",
+      "market_value_eur": 777.98,
+      "pnl_since_purchase_eur": -225.9,
+      "data_symbol_candidate": "ASML.US",
+      "asset_class": "stock",
+      "note": null
+    },
+    {
+      "name": "Eli Lilly & Co",
+      "market_value_eur": 579.72,
+      "pnl_since_purchase_eur": 74.68,
+      "data_symbol_candidate": "LLY.US",
+      "asset_class": "stock",
+      "note": null
+    },
+    {
+      "name": "Alphabet (A)",
+      "market_value_eur": 514.99,
+      "pnl_since_purchase_eur": -74.84,
+      "data_symbol_candidate": "GOOGL.US",
+      "asset_class": "stock",
+      "note": null
+    },
+    {
+      "name": "Schneider Electric",
+      "market_value_eur": 455.85,
+      "pnl_since_purchase_eur": -51.11,
+      "data_symbol_candidate": "SU.FR",
+      "asset_class": "stock",
+      "note": null
+    },
+    {
+      "name": "Semiconductor USD (Acc)",
+      "market_value_eur": 366.24,
+      "pnl_since_purchase_eur": -146.66,
+      "data_symbol_candidate": null,
+      "asset_class": "ETF",
+      "note": "instrument identification required"
+    },
+    {
+      "name": "Rocket Lab",
+      "market_value_eur": 260.5,
+      "pnl_since_purchase_eur": -240,
+      "data_symbol_candidate": "RKLB.US",
+      "asset_class": "stock",
+      "note": null
+    },
+    {
+      "name": "MSCI USA Daily (2x) Leveraged",
+      "market_value_eur": 236.67,
+      "pnl_since_purchase_eur": -0.74,
+      "data_symbol_candidate": null,
+      "asset_class": "leveraged ETF",
+      "note": "instrument identification required"
+    },
+    {
+      "name": "NVIDIA",
+      "market_value_eur": 232.18,
+      "pnl_since_purchase_eur": -18.85,
+      "data_symbol_candidate": "NVDA.US",
+      "asset_class": "stock",
+      "note": null
+    },
+    {
+      "name": "Oracle",
+      "market_value_eur": 162.18,
+      "pnl_since_purchase_eur": -138.82,
+      "data_symbol_candidate": "ORCL.US",
+      "asset_class": "stock",
+      "note": null
+    },
+    {
+      "name": "SanDisk",
+      "market_value_eur": 106.21,
+      "pnl_since_purchase_eur": -144.79,
+      "data_symbol_candidate": "SNDK.US",
+      "asset_class": "stock",
+      "note": "ticker/venue to verify"
+    },
+    {
+      "name": "Sivers Semiconductors",
+      "market_value_eur": 70.43,
+      "pnl_since_purchase_eur": -95.57,
+      "data_symbol_candidate": "SIVE.SE",
+      "asset_class": "stock",
+      "note": "ticker/venue to verify"
+    },
+    {
+      "name": "FTSE All-World USD (Acc)",
+      "market_value_eur": 3.81,
+      "pnl_since_purchase_eur": 0.01,
+      "data_symbol_candidate": null,
+      "asset_class": "ETF",
+      "note": "instrument identification required"
+    }
+  ]
+}
