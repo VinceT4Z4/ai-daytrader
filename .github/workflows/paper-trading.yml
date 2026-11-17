@@ -14,12 +14,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: feature/paper-trading-v1
           persist-credentials: true
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Run simulation
+      - name: Run unit tests\n        run: python -m unittest discover -s tests -v\n      - name: Run simulation
         run: python paper/trader.py
       - name: Scan real-portfolio watchlist (read-only)\n        run: python portfolio/watchlist.py\n      - name: Commit paper state
         run: |
